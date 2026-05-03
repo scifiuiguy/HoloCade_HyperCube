@@ -1,0 +1,5 @@
+# HoloCade HyperCube — pin versions once the service is scaffolded.
+# mediapipe>=0.10.0
+# numpy>=1.24.0
+# opencv-python-headless>=4.8.0
+# Optional GPU OpenCV: build opencv-python from source with CUDA, or use jetson/arm64 wheels per platform.
