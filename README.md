@@ -8,7 +8,9 @@ Canonical hardware and topology narrative: **`../CubeModule_README.md`** (dual P
 
 ## Network baseline (vision ↔ game PC)
 
-Documentation assumes **two Mini-ITX units** (reference: **AOOSTAR MACO** or equivalent), each with **dual 2.5GbE** and **no native 10GbE**. The HyperCube service should target **compressed** passthrough (**AV1** preferred where encode/decode are both controlled; **HEVC** as fallback) and may **stripe** high-bitrate traffic across **both NICs** (two cable runs) for aggregate headroom. **10GbE** is explicitly **out of scope** for the default bill of materials unless hardware is upgraded later.
+Documentation assumes **two Mini-ITX units** (reference: **AOOSTAR MACO** or equivalent), each with **dual 2.5GbE** on the **default** BOM. The HyperCube service should target **compressed** passthrough (**AV1** preferred where encode/decode are both controlled; **HEVC** as fallback) and may **stripe** high-bitrate traffic across **both NICs** (two cable runs) for aggregate headroom.
+
+**Optional ~US$400 upgrade:** each MACO can use **OCuLink** to a **PCIe x4 riser** plus **dual-port SFP28** NICs and a **DAC** for a **direct 25Gb/s-class** link between vision and game PCs (see **`CubeModule_README.md`** for a **Gemini-estimated parts list** ~**$381** new). That path is **not** onboard RJ45 10G—it is **SFP28**. **USB4 10G-T dongles** remain another optional path.
 
 ---
 
