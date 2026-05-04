@@ -6,6 +6,16 @@ Canonical hardware and topology narrative: **`../CubeModule_README.md`** (dual P
 
 ---
 
+## Unity loopback (dev)
+
+1. In a scene with **`CubeRigController`**, add **`HyperCubeQuadrantTcpHost`** (default ports **18001–18004**), **`HyperCubeUdpPoseReceiver`** (default **18100**), **`HyperCubePassthroughBinder`** (wire `cubeRig` + `quadrantHost`), and optionally **`HyperCubePoseTrackingProvider`** on the same object as `CubeRigController`’s **`faceTrackingProvider`** (assign `udpReceiver`, **`cubeRoot`** = rig transform).  
+2. Enter Play Mode so TCP listeners and UDP bind are active.  
+3. From this repo: `uv run hypercube-serve serve -c config.example.yaml` (or copy to `config.yaml`). HyperCube connects **outbound** to Unity and sends **big-endian uint32 + JPEG** per quadrant per frame, plus **HoloCade-compatible UDP** pose packets.
+
+Ports are set in **`config.example.yaml`**; mirror the same values on the Unity components.
+
+---
+
 ## Network baseline (vision ↔ game PC)
 
 Documentation assumes **two Mini-ITX units** (reference: **AOOSTAR MACO** or equivalent), each with **dual 2.5GbE** on the **default** BOM. The HyperCube service should target **compressed** passthrough (**AV1** preferred where encode/decode are both controlled; **HEVC** as fallback) and may **stripe** high-bitrate traffic across **both NICs** (two cable runs) for aggregate headroom.
@@ -26,7 +36,9 @@ This repo uses **[uv](https://docs.astral.sh/uv/)** so dependencies are **locked
 | `uv sync --extra cuda` | Also install **PyTorch + torchvision** built for **CUDA 12.4** (large download; use on NVIDIA dev laptops like RTX 3070). |
 | `uv lock` | Refresh **`uv.lock`** after you edit dependencies (or run `uv add <package>`). |
 | `uv run python …` | Run a script with the venv active, e.g. `uv run python -c "import mediapipe as mp; print(mp.__version__)"`. |
-| `uv run pytest` | Run tests once you add them. |
+| `uv run hypercube-serve dump-atlas -o out/atlas.png` | Write a synthetic **5120×2880** atlas PNG (sanity check). |
+| `uv run hypercube-serve serve -c config.yaml` | Stream **four TCP JPEG** quadrants to Unity + **UDP pose** (see **Unity loopback** below). |
+| `uv run python -m unittest discover -s tests -v` | Run unit tests. |
 
 **Add a dependency:** `uv add httpx` (example) — updates `pyproject.toml` and `uv.lock`.
 

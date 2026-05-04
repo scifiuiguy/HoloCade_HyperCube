@@ -1,0 +1,1 @@
+"""Quadrant crops from atlas."""

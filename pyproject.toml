@@ -6,9 +6,14 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "numpy>=1.24",
+    "pyyaml>=6.0",
+    "opencv-python-headless>=4.8",
     # OpenCV is pulled in by MediaPipe (opencv-contrib-python). Pin MediaPipe if you need a specific OpenCV line.
     "mediapipe>=0.10.14",
 ]
+
+[project.scripts]
+hypercube-serve = "holocade_hypercube.serve:main"
 
 [project.optional-dependencies]
 # NVIDIA Windows/Linux dev: `uv sync --extra cuda` (CUDA 12.4 wheels).
