@@ -90,7 +90,7 @@ src/holocade_hypercube/
 
 | Tag | Deliverable |
 |-----|----------------|
-| **v0.0.2** | Eight `FileMjpeg` sources + atlas packer + **offline** PNG dump (sanity). |
+| **v0.0.2** | ✅ Eight **synthetic** feeds + atlas packer + **offline** PNG dump (`dump-atlas`). *Optional:* eight `FileMjpeg` sources — deferred until MJPEG ingest is wired. |
 | **v0.0.3** | TCP MJPEG **one** quadrant from Python; **netcat** or browser smoke. |
 | **v0.0.4** | Four TCP MJPEG servers; Python **UDP pose** XOR-CRC verified with **unit test** against golden vectors from C#. |
 | **v0.0.5** | Unity: one quadrant → one **`CubePassthroughSources`** slot + visible portal. |

@@ -132,6 +132,20 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 </details>
 
 <details>
+<summary><strong>v0.0.2 (Complete)</strong></summary>
+
+<blockquote>
+
+### ✅ Completed (v0.0.2)
+- ✅ **Rectilinear atlas packer** — **5120×2880**, **4×2** @ **1280×720** (`atlas/packer.py`)
+- ✅ **Eight synthetic test feeds** — distinct BGR swatches per logical camera (`feeds/synthetic.py`); **MJPEG file / USB** sources still **TODO** for later milestones
+- ✅ **Offline PNG sanity** — `uv run hypercube-serve dump-atlas -o out/atlas.png`
+
+</blockquote>
+
+</details>
+
+<details>
 <summary><strong>v0.1.0 (In-Progress)</strong></summary>
 
 <blockquote>
@@ -139,8 +153,8 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 ### 🎯 Planned (v0.1.0)
 
 #### Vision pipeline (Python)
-- [ ] **Eight test camera feeds** — MJPEG files, synthetic tiles, and/or duplicated USB streams mapped to eight logical IDs
-- [ ] **Rectilinear atlas** — pack to **5120×2880** (default **4×2** @ 1280×720; configurable)
+- [ ] **Eight feeds from MJPEG files or USB** — map eight paths or devices into the same atlas contract (synthetic path already landed in v0.0.2)
+- [x] **Rectilinear atlas** — pack to **5120×2880** (default **4×2** @ 1280×720; configurable) *(v0.0.2)*
 - [ ] **Four “360 quadrant” outputs** — crop / partition atlas for Cube-facing delivery (v0.1 uses **stand-in** ROIs; full equirect unwrap later)
 - [ ] **Optional MediaPipe** — Face Landmarker on atlas or tiles; **per-pair L/R** selection stub; **station → face** assignment by atlas region
 - [ ] **TCP MJPEG (×4)** — e.g. ports **18001–18004** (or HTTP `/q0`…`/q3`) for Unity ingest (**not** HoloCade UDP — payload too large)
@@ -155,7 +169,7 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 - [ ] **Run book** — `config.example.yaml`, loopback + LAN smoke steps, tag **`v0.1.0`** when checklist is green
 
 #### Milestone tags (same plan)
-- [ ] **v0.0.2** — eight feeds + atlas + offline PNG dump
+- [x] **v0.0.2** — eight **synthetic** feeds + atlas + **`dump-atlas` PNG** *(MJPEG-on-disk optional stretch — not required for this tag)*
 - [ ] **v0.0.3** — one TCP MJPEG quadrant smoke
 - [ ] **v0.0.4** — four MJPEG servers + **UDP golden-vector** tests vs C#
 - [ ] **v0.0.5** — Unity: one quadrant → one portal
