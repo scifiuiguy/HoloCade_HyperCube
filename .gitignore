@@ -24,3 +24,12 @@ Thumbs.db
 captures/
 recordings/
 out/
+
+# Local YAML (copy from config.example.yaml); may contain LAN IPs or secrets.
+config.yaml
+
+# Local pipeline test assets (see README → v0.0.3); keep directory via tracked README only if you add one.
+pipeline-test-images/*.png
+pipeline-test-images/*.jpg
+pipeline-test-images/*.jpeg
+pipeline-test-images/*.webp

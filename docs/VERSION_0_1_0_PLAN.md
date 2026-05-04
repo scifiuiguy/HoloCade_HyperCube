@@ -1,6 +1,6 @@
 # HyperCube v0.0.1 → v0.1.0 implementation plan
 
-A shorter **🗺️ Roadmap** (same content, HoloCade README style) lives in the repo root **`README.md`**.
+A **🗺️ Roadmap** with **task lists** (including **`pipeline-test-images`** and **v0.0.3–v0.0.7** slices) lives in the repo root **`README.md`**. This file keeps **module layout**, **transport split**, and a **compact milestone table** aligned with that roadmap.
 
 Goal: **end-to-end dev pipeline** — eight **test** camera feeds → **rectilinear atlas** → **four “360 quadrant” outputs** ingestible by **Unity Cube** passthrough slots, plus **localized face / eye cues** for tracking shims. Target tag **`v0.1.0`** when the checklist below is complete.
 
@@ -86,17 +86,17 @@ src/holocade_hypercube/
 
 ---
 
-## Milestone slices (suggested tags)
+## Milestone slices (aligned with `README.md`)
 
 | Tag | Deliverable |
 |-----|----------------|
-| **v0.0.2** | ✅ Eight **synthetic** feeds + atlas packer + **offline** PNG dump (`dump-atlas`). *Optional:* eight `FileMjpeg` sources — deferred until MJPEG ingest is wired. |
-| **v0.0.3** | TCP MJPEG **one** quadrant from Python; **netcat** or browser smoke. |
-| **v0.0.4** | Four TCP MJPEG servers; Python **UDP pose** XOR-CRC verified with **unit test** against golden vectors from C#. |
-| **v0.0.5** | Unity: one quadrant → one **`CubePassthroughSources`** slot + visible portal. |
-| **v0.0.6** | Unity: four quadrants + **channel map** doc; **L/R selector** stub in Python. |
-| **v0.0.7** | MediaPipe on atlas (multi-face) → **station assignment** by atlas region; UDP drives **`CubeFaceTrackingProviderBase`**. |
-| **v0.1.0** | README “run book”, default **config.example.yaml**, **Windows + Linux** smoke notes, version bump. |
+| **v0.0.2** | ✅ Eight **synthetic** feeds + atlas packer + **offline** PNG dump (`dump-atlas`) + stub TCP/UDP loop. |
+| **v0.0.3** | **`pipeline-test-images/`** — two flank **PNGs** (`face_left` / `face_right`) repeated **`L,R` × 4** into eight slots → **Unity pixel/layout** validation on four TCP JPEG quadrants. |
+| **v0.0.4** | **Undistort + stereo rectification** maps per L/R pair (calibration on disk). |
+| **v0.0.5** | **Stereo depth** on rectified down-res ROI — **Vulkan** on Radeon, **CPU SGBM** fallback; OOB gating. |
+| **v0.0.6** | **MediaPipe** + **L/R flank selection** + **fuse depth + (u,v) → `vec3`** on Linux. |
+| **v0.0.7** | **UDP `vec3`** channel map + **Unity** ingest; **golden-vector** tests vs C#. |
+| **v0.1.0** | **Release gate** — optional **MJPEG/USB** eight feeds, run book, **stand-in** quadrant ROIs, version bump, tag. |
 
 ---
 

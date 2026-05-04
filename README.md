@@ -8,7 +8,7 @@ Canonical hardware and topology narrative: **`../CubeModule_README.md`** (dual P
 
 ## Unity loopback (dev)
 
-1. In a scene with **`CubeRigController`**, add **`HyperCubeQuadrantTcpHost`** (default ports **18001–18004**), **`HyperCubeUdpPoseReceiver`** (default **18100**), **`HyperCubePassthroughBinder`** (wire `cubeRig` + `quadrantHost`), and optionally **`HyperCubePoseTrackingProvider`** on the same object as `CubeRigController`’s **`faceTrackingProvider`** (assign `udpReceiver`, **`cubeRoot`** = rig transform).  
+1. In a scene with **`CubeRigController`**, add **`HyperCubeQuadrantTcpHost`** (default ports **18001–18004**), **`HoloCadeUDPTransport`** (**Role** = **Local listener**, **listener port** **18100**, bind **0.0.0.0**), **`HyperCubePassthroughBinder`** (wire `cubeRig` + `quadrantHost`), and optionally **`HyperCubePoseTrackingProvider`** on the same object as `CubeRigController`’s **`faceTrackingProvider`** (assign the **`HoloCadeUDPTransport`**, **`cubeRoot`** = rig transform).  
 2. Enter Play Mode so TCP listeners and UDP bind are active.  
 3. From this repo: `uv run hypercube-serve serve -c config.example.yaml` (or copy to `config.yaml`). HyperCube connects **outbound** to Unity and sends **big-endian uint32 + JPEG** per quadrant per frame, plus **HoloCade-compatible UDP** pose packets.
 
@@ -97,9 +97,10 @@ You can do **most of the HyperCube *application* work** on the laptop; the missi
 
 ```
 HoloCade_HyperCube/
-  README.md           # this file
-  docs/               # protocol drafts, calibration notes (as they land)
-  src/                # Python package or scripts (placeholder)
+  README.md                 # this file
+  docs/                     # protocol drafts, calibration notes (as they land)
+  pipeline-test-images/     # local only: drop flank PNGs here for v0.0.3 harness (gitignored)
+  src/                      # Python package `holocade_hypercube`
 ```
 
 Source layout will grow as services are implemented.
@@ -170,36 +171,109 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 </details>
 
 <details>
-<summary><strong>v0.1.0 (In-Progress)</strong></summary>
+<summary><strong>v0.0.3 (Planned) — Static flank PNG harness</strong></summary>
 
 <blockquote>
 
-### 🎯 Planned (v0.1.0)
+**Goal:** Feed **real still images** through the same **atlas → quadrant → TCP JPEG** path as production, so you can confirm **pixels** and **layout** in Unity **without** cameras or MJPEG files yet.
 
-#### Vision pipeline (Python)
-- [ ] **Eight feeds from MJPEG files or USB** — map eight paths or devices into the same atlas contract (synthetic path already landed in v0.0.2)
-- [x] **Rectilinear atlas** — pack to **5120×2880** (default **4×2** @ 1280×720; configurable) *(v0.0.2)*
-- [ ] **Four “360 quadrant” outputs** — crop / partition atlas for Cube-facing delivery (v0.1 uses **stand-in** ROIs; full equirect unwrap later)
-- [ ] **Optional MediaPipe** — Face Landmarker on atlas or tiles; **per-pair L/R** selection stub; **station → face** assignment by atlas region
-- [ ] **TCP MJPEG (×4)** — e.g. ports **18001–18004** (or HTTP `/q0`…`/q3`) for Unity ingest (**not** HoloCade UDP — payload too large)
+#### `pipeline-test-images/` (local drops)
+- [ ] **Directory** — `pipeline-test-images/` at repo root; **PNGs/JPEGs gitignored** (see `.gitignore`); document **exact filenames** in `config` (suggested defaults: `face_left.png`, `face_right.png` = same subject, **left-flank** vs **right-flank** capture).
+- [ ] **Eight logical cameras from two files** — load both as **BGR**, resize / center-crop to **1280×720** (or packer cell size) as needed; assign **camera indices `0…7`** by repeating the stereo pair **four times** (one repeat per notional quadrant), e.g. **`L,R,L,R,L,R,L,R`**, so every quadrant’s pair sees the **same** test content and the atlas looks **deterministic** for loopback.
+- [ ] **`feeds/` module** — e.g. `feeds/pipeline_test_png.py` or extend a small **FrameSource** protocol; **no** requirement that stereo geometry holds on this layout yet (identity rectify until v0.0.4).
+- [ ] **Config + CLI** — e.g. `feed_mode: pipeline_test_png` + `pipeline_test_images_dir` in YAML; `hypercube-serve serve -c …` selects file-backed loop instead of `synthetic_frame`.
+- [ ] **Validation** — Unity: four quadrants show **expected tiling**; optional `dump-atlas` in this mode writes one PNG for **visual diff** against golden layout.
 
-#### Pose & HoloCade UDP
-- [ ] **`HoloCadeUDPTransport`-compatible emitter** in Python — mirror `[0xAA][type][channel][payload][xor_crc8]` from `HoloCade_Unity` / `HoloCadeUDPTransport.cs`
-- [ ] **Channel map** — reserved band (e.g. **100–119**) for per-side **floats** `(u,v)`, confidence, **`uint32` seq** (fits existing per-scalar packets)
-- [ ] **Unity `CubeFaceTrackingProviderBase` shim** — reads UDP float cache → approximate **eye / face** world pose for `CubeRigController`
+</blockquote>
 
-#### Unity integration
-- [ ] **Four-stream decoder** — JPEG → `Texture2D` / `RenderTexture` → bind **`CubePassthroughSources`** at runtime
-- [ ] **Run book** — `config.example.yaml`, loopback + LAN smoke steps, tag **`v0.1.0`** when checklist is green
+</details>
 
-#### Milestone tags (same plan)
-- [x] **v0.0.2** — eight **synthetic** feeds + atlas + **`dump-atlas` PNG** *(MJPEG-on-disk optional stretch — not required for this tag)*
-- [ ] **v0.0.3** — one TCP MJPEG quadrant smoke
-- [ ] **v0.0.4** — four MJPEG servers + **UDP golden-vector** tests vs C#
-- [ ] **v0.0.5** — Unity: one quadrant → one portal
-- [ ] **v0.0.6** — Unity: four quadrants + side mapping doc
-- [ ] **v0.0.7** — MediaPipe + assignment + UDP driving tracking
-- [ ] **v0.1.0** — release polish + version bump in `pyproject.toml`
+<details>
+<summary><strong>v0.0.4 (Planned) — Undistort + stereo rectification</strong></summary>
+
+<blockquote>
+
+**Goal:** Per **physical L/R pair**, apply **known intrinsics + extrinsics** so **epipolar lines align** before any stereo matcher or MediaPipe consumer.
+
+- [ ] **Calibration artifact format** — store per-pair **camera matrices, distortion coeffs, stereo R|T** (and rectification **Q** / remap maps); load from `calibration/` (or embedded in YAML); version string per chassis SKU.
+- [ ] **Remap stage** — undistort + **stereo rectification** → **rectified L/R** buffers (CPU OpenCV first is fine); **identity** maps when cal missing (PNG test mode).
+- [ ] **Docs** — short “how we calibrate” pointer in `docs/` (Charuco / checkerboard capture on the bench).
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.0.5 (Planned) — Stereo depth (Vulkan primary, CPU fallback)</strong></summary>
+
+<blockquote>
+
+**Goal:** **Dense or semi-dense depth** from **rectified L/R** on a **down-res ROI** (2–3 ft working range, **min/max disparity** clamp, **OOB** disables tracking).
+
+- [ ] **Vulkan compute** path on **Radeon** target (SGM / AD-Census class or tuned simpler matcher first).
+- [ ] **CPU fallback** — OpenCV `StereoSGBM` / `StereoBM` for Windows dev / bring-up.
+- [ ] **Output** — disparity or **metric depth** map in a frame agreed with fusion (same clock as rectified left **preferred**, loose coupling OK per design).
+- [ ] **Parallel to atlas** — stereo runs on **pair buffers**; **does not** require atlas-first packing.
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.0.6 (Planned) — MediaPipe + L/R selection + fusion → `vec3`</strong></summary>
+
+<blockquote>
+
+**Goal:** **Sibling branch** to stereo: both consume **rectified RGB** (typical: **Face Landmarker** on **rectified left** or a **face ROI**); combine with **depth** for **Linux-side** head position.
+
+- [ ] **MediaPipe Face Landmarker** — wire Tasks API; choose **input resolution** deliberately (atlas-wide **vs** per-station crop documented).
+- [ ] **L/R flank policy** — stub **center + buffer** rule so **one** flank’s stream drives landmarks when appropriate (no dual tracking).
+- [ ] **Fusion** — each frame (or each stereo frame): **latest (u,v)** landmark → **sample depth** at that location (patch median optional) → **back-project** to **`vec3`** in **camera / cube / world** (document frame); attach **confidence** + **seq**.
+- [ ] **Not** the same compute module as Vulkan stereo — **pipeline graph** handoff (GPU → CPU or shared memory) is explicit.
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.0.7 (Planned) — UDP `vec3` + Unity ingest</strong></summary>
+
+<blockquote>
+
+**Goal:** HoloCade-compatible **UDP** carries **3D head position** (and seq/confidence); **TCP JPEG quadrants** stay the **parallel** passthrough path (**no lockstep** with pose required for first ship; document optional timestamps).
+
+- [ ] **Channel map** — extend `pose_channels.py` ↔ `HyperCubePoseChannelIds.cs` (e.g. **three floats per side** for position + existing **seq**; or per-player layout if cube grows beyond four sides).
+- [ ] **Python emitter** — `build_float` × N per bundle; keep under **`HoloCadeUDPTransport`** per-packet limits unless a negotiated extension lands later.
+- [ ] **Unity** — **`HoloCadeUDPTransport`** (listener) + **`HyperCubePoseTrackingProvider`** (or successor) read **`Vector3`** (not stub **u,v → fake Z**); `CubeRigController` / tracking hookup validated in Play Mode.
+- [ ] **Golden-vector tests** — Python UDP bytes vs C# CRC/layout (extend `tests/test_holocade_udp_packet.py` or add vectors file).
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.1.0 (Planned) — Release gate</strong></summary>
+
+<blockquote>
+
+**Goal:** Close the **dev vertical slice**: file or PNG/MJPEG feeds, **stand-in** quadrant ROIs (full **equirect** unwrap later), **run book**, tag **`v0.1.0`**, **`pyproject.toml` / `__version__` bump**.
+
+#### Still on the checklist for this tag
+- [ ] **Eight feeds from disk or live** — `pipeline-test-images` **PNG** harness (v0.0.3) **plus** optional **MJPEG file loops** / **USB** mapping into the same eight-slot contract.
+- [x] **Rectilinear atlas** for passthrough — **5120×2880** packer *(v0.0.2)*; may consume **raw or rectified RGB** per cell policy (document which).
+- [ ] **Four quadrant TCP JPEG** to Unity — ports **18001–18004** (or HTTP smoke); bind **`CubePassthroughSources`** at runtime (**`HyperCubePassthroughBinder`** path).
+- [ ] **Four “360 quadrant” crops** — **stand-in** geometry (current vertical bands or improved ROIs); **not** final equirect until a later milestone.
+- [ ] **Optional CUDA stereo path** — parity or faster dev on NVIDIA; **Vulkan** remains primary for **Radeon** Mini-ITX.
+- [ ] **Run book** — `config.example.yaml`, loopback + LAN steps, known limitations (self-view, sync).
+
+#### Milestone tag index (v0.0.2 → v0.1.0)
+- [x] **v0.0.2** — eight **synthetic** feeds + atlas + **`dump-atlas`** + stub UDP + TCP loop *(no file feeds)*  
+- [ ] **v0.0.3** — **`pipeline-test-images/`** two flank PNGs → **L,R×4** into eight slots → Unity **pixel/layout** validation  
+- [ ] **v0.0.4** — **Undistort + stereo rectify** maps applied per pair  
+- [ ] **v0.0.5** — **Stereo depth** (Vulkan + CPU fallback), OOB gating  
+- [ ] **v0.0.6** — **MediaPipe** + **L/R selection** + **depth + landmark → `vec3`** on Linux  
+- [ ] **v0.0.7** — **UDP `vec3`** channel map + **Unity** provider + **golden vectors**  
+- [ ] **v0.1.0** — **Release polish**, version bump, tag when above are green  
 
 </blockquote>
 

@@ -6,7 +6,7 @@ unity_host: "127.0.0.1"
 # Four quadrant JPEG streams (Unity HyperCubeQuadrantTcpHost listens on these)
 quadrant_tcp_ports: [18001, 18002, 18003, 18004]
 
-# HoloCade-compatible UDP pose (Unity HyperCubeUdpPoseReceiver listens here)
+# HoloCade-compatible UDP pose (Unity HoloCadeUDPTransport Local listener on this port)
 pose_udp_host: "127.0.0.1"
 pose_udp_port: 18100
 
