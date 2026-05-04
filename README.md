@@ -4,8 +4,6 @@ Companion repository for **HoloCade Cube** deployments that split **camera captu
 
 Canonical hardware and topology narrative: **`../CubeModule_README.md`** (dual PC, Ethernet, per-display flank stereo cameras).
 
-**Roadmap:** **`docs/VERSION_0_1_0_PLAN.md`** — v0.0.1 → v0.1.0 (eight test feeds → four quadrant streams → Unity + UDP pose).
-
 ---
 
 ## Network baseline (vision ↔ game PC)
@@ -100,6 +98,76 @@ Source layout will grow as services are implemented.
 
 - **Unity** consumes **`CubePassthroughSources`** and **`CubeFaceTrackingProviderBase`**; those types stay in `HoloCade_Unity`.
 - **HyperCube** is responsible for everything **up to** the network boundary: timestamps, calibrated warps, encoded frames, and pose packets compatible with the Windows ingest layer (to be implemented in Unity or a small native bridge).
+
+---
+
+## 🗺️ Roadmap
+
+Full implementation checklist, module layout, risks, and milestone definitions: **`docs/VERSION_0_1_0_PLAN.md`**.
+
+<details>
+<summary><strong>v0.0.1 (Current — Pre-Alpha)</strong></summary>
+
+<blockquote>
+
+### ✅ Baseline
+- ✅ **uv / Python scaffold** — `pyproject.toml`, `uv.lock`, `.python-version` (3.11), editable package `holocade_hypercube`
+- ✅ **Hardware & transport docs** — dual **2.5GbE** default, optional **OCuLink + SFP28** BOM (see `CubeModule_README.md`), dev-on-Windows notes
+- ✅ **v0.1.0 plan artifact** — `docs/VERSION_0_1_0_PLAN.md` (end-to-end slice definition)
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.1.0 (In-Progress)</strong></summary>
+
+<blockquote>
+
+### 🎯 Planned (v0.1.0)
+
+#### Vision pipeline (Python)
+- [ ] **Eight test camera feeds** — MJPEG files, synthetic tiles, and/or duplicated USB streams mapped to eight logical IDs
+- [ ] **Rectilinear atlas** — pack to **5120×2880** (default **4×2** @ 1280×720; configurable)
+- [ ] **Four “360 quadrant” outputs** — crop / partition atlas for Cube-facing delivery (v0.1 uses **stand-in** ROIs; full equirect unwrap later)
+- [ ] **Optional MediaPipe** — Face Landmarker on atlas or tiles; **per-pair L/R** selection stub; **station → face** assignment by atlas region
+- [ ] **TCP MJPEG (×4)** — e.g. ports **18001–18004** (or HTTP `/q0`…`/q3`) for Unity ingest (**not** HoloCade UDP — payload too large)
+
+#### Pose & HoloCade UDP
+- [ ] **`HoloCadeUDPTransport`-compatible emitter** in Python — mirror `[0xAA][type][channel][payload][xor_crc8]` from `HoloCade_Unity` / `HoloCadeUDPTransport.cs`
+- [ ] **Channel map** — reserved band (e.g. **100–119**) for per-side **floats** `(u,v)`, confidence, **`uint32` seq** (fits existing per-scalar packets)
+- [ ] **Unity `CubeFaceTrackingProviderBase` shim** — reads UDP float cache → approximate **eye / face** world pose for `CubeRigController`
+
+#### Unity integration
+- [ ] **Four-stream decoder** — JPEG → `Texture2D` / `RenderTexture` → bind **`CubePassthroughSources`** at runtime
+- [ ] **Run book** — `config.example.yaml`, loopback + LAN smoke steps, tag **`v0.1.0`** when checklist is green
+
+#### Milestone tags (same plan)
+- [ ] **v0.0.2** — eight feeds + atlas + offline PNG dump
+- [ ] **v0.0.3** — one TCP MJPEG quadrant smoke
+- [ ] **v0.0.4** — four MJPEG servers + **UDP golden-vector** tests vs C#
+- [ ] **v0.0.5** — Unity: one quadrant → one portal
+- [ ] **v0.0.6** — Unity: four quadrants + side mapping doc
+- [ ] **v0.0.7** — MediaPipe + assignment + UDP driving tracking
+- [ ] **v0.1.0** — release polish + version bump in `pyproject.toml`
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.2.0+ (Future)</strong></summary>
+
+<blockquote>
+
+### 🎯 Deferred
+- [ ] **AV1 / HEVC** transport (replace or augment CPU MJPEG for 4K/8K-class passthrough)
+- [ ] **GPU equirect / Vulkan** compositor on AMD vision hardware
+- [ ] **Production capture** — v4l2 multi-device, genlock / trigger, real calibration
+
+</blockquote>
+
+</details>
 
 ---
 

@@ -1,5 +1,7 @@
 # HyperCube v0.0.1 → v0.1.0 implementation plan
 
+A shorter **🗺️ Roadmap** (same content, HoloCade README style) lives in the repo root **`README.md`**.
+
 Goal: **end-to-end dev pipeline** — eight **test** camera feeds → **rectilinear atlas** → **four “360 quadrant” outputs** ingestible by **Unity Cube** passthrough slots, plus **localized face / eye cues** for tracking shims. Target tag **`v0.1.0`** when the checklist below is complete.
 
 ---
