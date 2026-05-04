@@ -137,9 +137,33 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 <blockquote>
 
 ### ✅ Completed (v0.0.2)
-- ✅ **Rectilinear atlas packer** — **5120×2880**, **4×2** @ **1280×720** (`atlas/packer.py`)
-- ✅ **Eight synthetic test feeds** — distinct BGR swatches per logical camera (`feeds/synthetic.py`); **MJPEG file / USB** sources still **TODO** for later milestones
-- ✅ **Offline PNG sanity** — `uv run hypercube-serve dump-atlas -o out/atlas.png`
+
+#### Atlas & compositing
+- ✅ **Rectilinear 5120×2880 packer** — `atlas/packer.py` (`pack_four_by_two`): default **4×2** grid @ **1280×720** per cell
+- ✅ **Stand-in quadrant split** — `quadrants/split.py` (`four_vertical_bands`): atlas → **four vertical bands** for early TCP/JPEG smoke (**not** final equirect / annulus ROIs; those stay on the v0.1.0 plan)
+
+#### Feeds
+- ✅ **Eight synthetic BGR feeds** — `feeds/synthetic.py` (`synthetic_frame`): **NumPy-first** colored tiles per logical camera index (**no** v4l2, disk MJPEG loop, or USB mapping in this tag)
+
+#### HoloCade-compatible pose (stub)
+- ✅ **Binary packet builder** — `protocol/holocade_udp.py`: `[0xAA][type][channel][payload][xor_crc8]`, `build_float` / `build_int32`, CRC aligned with **`HoloCadeUDPTransport`** semantics
+- ✅ **Draft pose channel IDs** — `pose_channels.py` (`HyperCubePoseChannelIds`): per-side **u,v** floats + shared **`Sequence`** int channel
+- ✅ **Stub pose bundle in the serve loop** — `serve.py` emits placeholder **(u,v)** per cardinal side + **seq** each frame while **`serve`** runs
+
+#### CLI, config, and packaging
+- ✅ **`hypercube-serve` console script** — `pyproject.toml` → `holocade_hypercube.serve:main` with subcommands **`dump-atlas`** and **`serve`**
+- ✅ **YAML-driven settings** — `config.example.yaml`: `unity_host`, `quadrant_tcp_ports` (**18001–18004**), `pose_udp_host` / `pose_udp_port` (**18100**), `fps`
+- ✅ **Offline atlas PNG** — `uv run hypercube-serve dump-atlas -o out/atlas.png` (writes **5120×2880** synthetic atlas and exits)
+
+#### Runtime loop (dev ↔ Unity loopback)
+- ✅ **Outbound TCP quadrant JPEG** — per-quadrant **big-endian uint32 length + JPEG** to `unity_host`:**ports**; reconnects when a send fails (matches **Unity loopback** wiring in this README)
+- ✅ **UDP pose datagrams** — same loop sends stub packets to the configured pose host/port
+
+#### Tests
+- ✅ **UDP packet unit test** — `tests/test_holocade_udp_packet.py` (marker, type, channel, float payload LE, XOR CRC8)
+
+#### Explicitly out of scope for this tag
+- [ ] **Eight `FileMjpeg` / USB** sources — carried forward as **[ ] Eight feeds from MJPEG files or USB** under **v0.1.0** below
 
 </blockquote>
 
