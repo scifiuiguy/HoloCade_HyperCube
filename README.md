@@ -6,6 +6,12 @@ Canonical hardware and topology narrative: **`../CubeModule_README.md`** (dual P
 
 ---
 
+## Network baseline (vision ↔ game PC)
+
+Documentation assumes **two Mini-ITX units** (reference: **AOOSTAR MACO** or equivalent), each with **dual 2.5GbE** and **no native 10GbE**. The HyperCube service should target **compressed** passthrough (**AV1** preferred where encode/decode are both controlled; **HEVC** as fallback) and may **stripe** high-bitrate traffic across **both NICs** (two cable runs) for aggregate headroom. **10GbE** is explicitly **out of scope** for the default bill of materials unless hardware is upgraded later.
+
+---
+
 ## Python environment (`uv` + `.venv`)
 
 This repo uses **[uv](https://docs.astral.sh/uv/)** so dependencies are **locked** (`uv.lock`) and isolated in **`.venv/`** (not your global Python).
