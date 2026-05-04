@@ -4,6 +4,8 @@ Companion repository for **HoloCade Cube** deployments that split **camera captu
 
 Canonical hardware and topology narrative: **`../CubeModule_README.md`** (dual PC, Ethernet, per-display flank stereo cameras).
 
+**Roadmap:** **`docs/VERSION_0_1_0_PLAN.md`** — v0.0.1 → v0.1.0 (eight test feeds → four quadrant streams → Unity + UDP pose).
+
 ---
 
 ## Network baseline (vision ↔ game PC)
