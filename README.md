@@ -119,7 +119,7 @@ Source layout will grow as services are implemented.
 Full implementation checklist, module layout, risks, and milestone definitions: **`docs/VERSION_0_1_0_PLAN.md`**.
 
 <details>
-<summary><strong>v0.0.1 (Current — Pre-Alpha)</strong></summary>
+<summary><strong>v0.0.1 (Complete)</strong></summary>
 
 <blockquote>
 
@@ -217,6 +217,8 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 </blockquote>
 
 </details>
+
+**✅ Complete:** **v0.0.4**
 
 <details>
 <summary><strong>v0.0.5 (Planned) — Stereo depth (Vulkan primary, CPU fallback)</strong></summary>
