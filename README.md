@@ -285,7 +285,7 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 #### Milestone tag index (v0.0.2 → v0.1.0)
 - [x] **v0.0.2** — eight **synthetic** feeds + atlas + **`dump-atlas`** + stub UDP + TCP loop *(no file feeds)*  
 - [x] **v0.0.3** — **`pipeline-test-images/`** two flank PNGs → **L,R×4** into eight slots → **portrait or landscape** cells per config → Unity **pixel/layout** validation  
-- [ ] **v0.0.4** — **Undistort + stereo rectify** maps applied per pair  
+- [x] **v0.0.4** — **Undistort + stereo rectify** maps applied per pair  
 - [ ] **v0.0.5** — **Stereo depth** (Vulkan + CPU fallback), OOB gating  
 - [ ] **v0.0.6** — **MediaPipe** + **L/R selection** + **depth + landmark → `vec3`** on Linux  
 - [ ] **v0.0.7** — **UDP `vec3`** channel map + **Unity** provider + **golden vectors**  
