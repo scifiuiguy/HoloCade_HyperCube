@@ -11,3 +11,30 @@ pose_udp_host: "127.0.0.1"
 pose_udp_port: 18100
 
 fps: 30.0
+
+# Feed source:
+# - synthetic: generated color swatches for all 8 logical cameras
+# - pipeline_test_png: load left/right PNGs from pipeline_test_images_dir and repeat L,R x4
+feed_mode: "synthetic"
+pipeline_test_images_dir: "pipeline-test-images"
+pipeline_test_left_image: "face_left.png"
+pipeline_test_right_image: "face_right.png"
+
+# Stereo undistort + rectification (pipeline_test_png only; synthetic feed ignores this):
+# - none: no remap (default)
+# - stereo_json: load stereo_calibration_json (camera matrices, distortion, R|T); JSON is fine for tiny cal files
+stereo_rectify_mode: "none"
+# stereo_calibration_json: "calibration/example_stereo_pair.json"
+
+# Cell geometry (portrait or landscape). Atlas size is 4*cell_width x 2*cell_height.
+cell_width: 1280
+cell_height: 720
+
+# Optional explicit quadrant output resolution. If omitted, defaults to cell_width/cell_height.
+# quadrant_output_width: 1280
+# quadrant_output_height: 720
+
+# Quadrant layout mode:
+# - vertical_bands (default): split atlas into 4 vertical slices (current placeholder behavior)
+# - atlas_preview: send full atlas to all 4 TCP outputs (debug LRLR/LRLR packing visually)
+quadrant_layout_mode: "vertical_bands"

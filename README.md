@@ -36,7 +36,7 @@ This repo uses **[uv](https://docs.astral.sh/uv/)** so dependencies are **locked
 | `uv sync --extra cuda` | Also install **PyTorch + torchvision** built for **CUDA 12.4** (large download; use on NVIDIA dev laptops like RTX 3070). |
 | `uv lock` | Refresh **`uv.lock`** after you edit dependencies (or run `uv add <package>`). |
 | `uv run python …` | Run a script with the venv active, e.g. `uv run python -c "import mediapipe as mp; print(mp.__version__)"`. |
-| `uv run hypercube-serve dump-atlas -o out/atlas.png` | Write a synthetic **5120×2880** atlas PNG (sanity check). |
+| `uv run hypercube-serve dump-atlas -c config.yaml -o out/atlas.png` | Write atlas PNG using **`cell_width`/`cell_height`** and **`feed_mode`** from config (default synthetic still works without `-c`). |
 | `uv run hypercube-serve serve -c config.yaml` | Stream **four TCP JPEG** quadrants to Unity + **UDP pose** (see **Unity loopback** below). |
 | `uv run python -m unittest discover -s tests -v` | Run unit tests. |
 
@@ -171,33 +171,48 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 </details>
 
 <details>
-<summary><strong>v0.0.3 (Planned) — Static flank PNG harness</strong></summary>
+<summary><strong>v0.0.3 (Complete) — Static flank PNG harness</strong></summary>
 
 <blockquote>
 
 **Goal:** Feed **real still images** through the same **atlas → quadrant → TCP JPEG** path as production, so you can confirm **pixels** and **layout** in Unity **without** cameras or MJPEG files yet.
 
+### ✅ Completed (v0.0.3)
+
+#### Cell geometry — **portrait or landscape** (early; applies to test PNGs **and** live feeds)
+- ✅ **Config-driven cell size** — YAML selects **`cell_width` × `cell_height`** (and thus atlas footprint), e.g. **landscape** `1280×720` *(default)* or **portrait** `720×1280`. Portrait sources are **not** forced into a landscape cell; orientation mismatch raises at runtime. Packing uses **`4·cell_w × 2·cell_h`**; optional **`quadrant_output_width` / `quadrant_output_height`** downscale TCP JPEG per quadrant.
+- ✅ **Refactor hard-coded constants** — **`pack_four_by_two(..., cell_width, cell_height)`** drives atlas size; **`four_vertical_bands`** validates against derived atlas size and defaults output to cell dimensions; **`synthetic_frame(w,h)`** and **`dump-atlas`** (`-c config.yaml`) use the same contract. *(Legacy `CELL_W` / `CELL_H` / `ATLAS_*` in `packer.py` remain as defaults only.)*
+
 #### `pipeline-test-images/` (local drops)
-- [ ] **Directory** — `pipeline-test-images/` at repo root; **PNGs/JPEGs gitignored** (see `.gitignore`); document **exact filenames** in `config` (suggested defaults: `face_left.png`, `face_right.png` = same subject, **left-flank** vs **right-flank** capture).
-- [ ] **Eight logical cameras from two files** — load both as **BGR**, resize / center-crop to **1280×720** (or packer cell size) as needed; assign **camera indices `0…7`** by repeating the stereo pair **four times** (one repeat per notional quadrant), e.g. **`L,R,L,R,L,R,L,R`**, so every quadrant’s pair sees the **same** test content and the atlas looks **deterministic** for loopback.
-- [ ] **`feeds/` module** — e.g. `feeds/pipeline_test_png.py` or extend a small **FrameSource** protocol; **no** requirement that stereo geometry holds on this layout yet (identity rectify until v0.0.4).
-- [ ] **Config + CLI** — e.g. `feed_mode: pipeline_test_png` + `pipeline_test_images_dir` in YAML; `hypercube-serve serve -c …` selects file-backed loop instead of `synthetic_frame`.
-- [ ] **Validation** — Unity: four quadrants show **expected tiling**; optional `dump-atlas` in this mode writes one PNG for **visual diff** against golden layout.
+- ✅ **Directory** — `pipeline-test-images/` at repo root; raster assets **gitignored** (see `.gitignore`); filenames configurable (`pipeline_test_left_image` / `pipeline_test_right_image`; defaults `face_left.png`, `face_right.png`). See `pipeline-test-images/README.md`.
+- ✅ **Eight logical cameras from two files** — load both as **BGR**; **resize/crop only when size ≠ cell**, **same orientation only** (no portrait→landscape rotation); indices **`L,R,L,R,L,R,L,R`**.
+- ✅ **`feeds/` wiring** — **`feed_mode: pipeline_test_png`** implemented in **`serve.py`** (`_pipeline_test_png_frames`, `_fit_to_cell_same_orientation`). *Optional later refactor:* extract to **`feeds/pipeline_test_png.py`** + a small **FrameSource** protocol.
+- ✅ **Config + CLI** — `feed_mode`, `pipeline_test_*`, `cell_width` / `cell_height`, **`quadrant_layout_mode`** (`vertical_bands` | `atlas_preview`); `hypercube-serve serve -c …` and **`dump-atlas -c …`**.
+
+#### Validation
+- ✅ **HyperCube + Unity loopback** — four TCP JPEG quadrants + stub UDP; **`pipeline_test_png`** mode exercised against portrait flank PNGs.
 
 </blockquote>
 
 </details>
 
 <details>
-<summary><strong>v0.0.4 (Planned) — Undistort + stereo rectification</strong></summary>
+<summary><strong>v0.0.4 (Complete) — Undistort + stereo rectification</strong></summary>
 
 <blockquote>
 
 **Goal:** Per **physical L/R pair**, apply **known intrinsics + extrinsics** so **epipolar lines align** before any stereo matcher or MediaPipe consumer.
 
-- [ ] **Calibration artifact format** — store per-pair **camera matrices, distortion coeffs, stereo R|T** (and rectification **Q** / remap maps); load from `calibration/` (or embedded in YAML); version string per chassis SKU.
-- [ ] **Remap stage** — undistort + **stereo rectification** → **rectified L/R** buffers (CPU OpenCV first is fine); **identity** maps when cal missing (PNG test mode).
-- [ ] **Docs** — short “how we calibrate” pointer in `docs/` (Charuco / checkerboard capture on the bench).
+### ✅ Completed (v0.0.4)
+
+#### Calibration artifact format
+- ✅ **JSON per stereo pair** — **camera matrices, distortion coeffs, stereo R|T**; configured via `stereo_rectify_mode` + `stereo_calibration_json` (example: `calibration/example_stereo_pair.json`).
+
+#### Remap stage
+- ✅ **Undistort + stereo rectification** — `cv2.stereoRectify` + `initUndistortRectifyMap` + `remap` applied in `pipeline_test_png` before `_fit_to_cell_same_orientation`; **no-op** when mode is `none`.
+
+#### Docs
+- ✅ **Capture + QC notes** — `docs/CAMERA_CALIBRATION.md` (Charuco, LED-metronome sync, pose diversity, GoPro cautions, factory jig concept including **five-panel “star”**).
 
 </blockquote>
 
@@ -259,16 +274,17 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 **Goal:** Close the **dev vertical slice**: file or PNG/MJPEG feeds, **stand-in** quadrant ROIs (full **equirect** unwrap later), **run book**, tag **`v0.1.0`**, **`pyproject.toml` / `__version__` bump**.
 
 #### Still on the checklist for this tag
-- [ ] **Eight feeds from disk or live** — `pipeline-test-images` **PNG** harness (v0.0.3) **plus** optional **MJPEG file loops** / **USB** mapping into the same eight-slot contract.
-- [x] **Rectilinear atlas** for passthrough — **5120×2880** packer *(v0.0.2)*; may consume **raw or rectified RGB** per cell policy (document which).
+- [ ] **Eight feeds from disk or live** — `pipeline-test-images` **PNG** harness ✅ *(v0.0.3)* **plus** optional **MJPEG file loops** / **USB** mapping into the same eight-slot contract; **same cell orientation** (portrait vs landscape) as config for test and live.
+- [x] **Rectilinear atlas** for passthrough — **5120×2880** packer *(v0.0.2, landscape cells only)*; **v0.0.3+** generalizes atlas size from **configurable cell** `W×H` **× 4×2** (document portrait atlas footprint when `cell_height > cell_width`).
 - [ ] **Four quadrant TCP JPEG** to Unity — ports **18001–18004** (or HTTP smoke); bind **`CubePassthroughSources`** at runtime (**`HyperCubePassthroughBinder`** path).
 - [ ] **Four “360 quadrant” crops** — **stand-in** geometry (current vertical bands or improved ROIs); **not** final equirect until a later milestone.
+- [ ] **Unity (HoloCade_Unity) — paired** — procedural **interior sphere** (or segmented sphere) mesh + UVs to display equirect / per-quadrant warps, replacing **temporary portal quads** in `CubeBase` when that contract is ready *(see **SDK roadmap → v0.1.4 → Cube equirect / sphere display**)*.
 - [ ] **Optional CUDA stereo path** — parity or faster dev on NVIDIA; **Vulkan** remains primary for **Radeon** Mini-ITX.
 - [ ] **Run book** — `config.example.yaml`, loopback + LAN steps, known limitations (self-view, sync).
 
 #### Milestone tag index (v0.0.2 → v0.1.0)
 - [x] **v0.0.2** — eight **synthetic** feeds + atlas + **`dump-atlas`** + stub UDP + TCP loop *(no file feeds)*  
-- [ ] **v0.0.3** — **`pipeline-test-images/`** two flank PNGs → **L,R×4** into eight slots → Unity **pixel/layout** validation  
+- [x] **v0.0.3** — **`pipeline-test-images/`** two flank PNGs → **L,R×4** into eight slots → **portrait or landscape** cells per config → Unity **pixel/layout** validation  
 - [ ] **v0.0.4** — **Undistort + stereo rectify** maps applied per pair  
 - [ ] **v0.0.5** — **Stereo depth** (Vulkan + CPU fallback), OOB gating  
 - [ ] **v0.0.6** — **MediaPipe** + **L/R selection** + **depth + landmark → `vec3`** on Linux  
@@ -286,7 +302,7 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 
 ### 🎯 Deferred
 - [ ] **AV1 / HEVC** transport (replace or augment CPU MJPEG for 4K/8K-class passthrough)
-- [ ] **GPU equirect / Vulkan** compositor on AMD vision hardware
+- [ ] **GPU equirect / Vulkan** compositor on AMD vision hardware — **Unity:** align **procedural sphere UVs + materials** with the shipped equirect layout *(same HoloCade_Unity task as v0.1.0 “paired” bullet; finalize when this lands).*
 - [ ] **Production capture** — v4l2 multi-device, genlock / trigger, real calibration
 
 </blockquote>

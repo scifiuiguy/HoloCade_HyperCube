@@ -1,0 +1,18 @@
+# HyperCube config for pipeline-test-images harness (L/R PNG pair repeated across 8 slots)
+unity_host: "127.0.0.1"
+quadrant_tcp_ports: [18001, 18002, 18003, 18004]
+pose_udp_host: "127.0.0.1"
+pose_udp_port: 18100
+fps: 30.0
+
+feed_mode: "pipeline_test_png"
+pipeline_test_images_dir: "pipeline-test-images"
+pipeline_test_left_image: "face_left.png"
+pipeline_test_right_image: "face_right.png"
+
+# Portrait cell geometry matching current test images.
+cell_width: 720
+cell_height: 1280
+
+# Use normal vertical band split so each quadrant gets its own slice (more realistic perf).
+quadrant_layout_mode: "vertical_bands"

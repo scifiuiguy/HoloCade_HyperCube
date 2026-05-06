@@ -11,7 +11,7 @@ Goal: **end-to-end dev pipeline** — eight **test** camera feeds → **rectilin
 | In scope | Out of scope (later) |
 |----------|----------------------|
 | **Synthetic or file-based** “8 cameras” (MJPEG files, looping clips, or USB cams mapped to 8 logical IDs) | Real eight-camera genlock / production calibration |
-| **Rectilinear 5120×2880 atlas** (4×2 @ 1280×720 per cell, or configurable) | Full GPU equirect warp shipping on AMD |
+| **Rectilinear atlas** — **4×2** grid of **configurable** cells (**landscape** e.g. `1280×720` *or* **portrait** e.g. `720×1280`); atlas pixel size = **`4·cell_w × 2·cell_h`** (no forced reformat of portrait captures into landscape cells) | Full GPU equirect warp shipping on AMD |
 | **Four quadrant video streams** to Unity (see transport) | 8K HEVC/AV1 at production bitrates |
 | **Per-station face anchor** in **atlas UV space** or **world-space** via UDP | Lenticular / full stereo reprojection |
 | **Unity**: bind streams to **`CubePassthroughSources`** + **`CubeFaceTrackingProviderBase`** stub | Polished latency hiding, FEC, multi-NIC striping |
@@ -49,13 +49,13 @@ Goal: **end-to-end dev pipeline** — eight **test** camera feeds → **rectilin
 src/holocade_hypercube/
   __init__.py
   version.py
-  config.py                 # YAML or dataclass: ports, paths, atlas layout
+  config.py                 # YAML or dataclass: ports, paths, atlas layout, cell_w/cell_h (portrait or landscape)
   feeds/
     base.py                 # FrameSource protocol
     file_mjpeg.py           # 8 paths, loop
     synthetic.py            # colored tiles + optional noise (no hardware)
   atlas/
-    packer.py               # 8 → 5120x2880 rectilinear grid
+    packer.py               # 8 → (4*cell_w) x (2*cell_h) rectilinear grid
     pair_selector.py        # L/R per pair (stub: fixed or bbox heuristic)
   output/
     quadrants.py            # crop atlas → 4 textures (same res or downscale)
@@ -70,7 +70,7 @@ src/holocade_hypercube/
 
 1. **Acquire** eight frames (same wall-clock `t`; monotonic `frame_id`).
 2. **Optional:** run **MediaPipe Face Landmarker** on **full atlas** or **per-tile crops** → **bbox centers** → drive **`pair_selector`** (which camera tile is “live” for that station).
-3. **`packer`:** write eight cells into **5120×2880** BGR/RGB buffer.
+3. **`packer`:** write eight cells into a **rectilinear** BGR/RGB buffer sized **`4·cell_w × 2·cell_h`** from config (defaults today: **5120×2880** for `1280×720` landscape cells).
 4. **`quadrants`:** define **four** fixed ROIs that correspond to your **360° partition** (for v0.1, literal **quarter-annulus in UV** can be approximated by **four large crops** or **four pre-authoured rects** in atlas space — document that this is a **stand-in** until real equirect unwrap exists).
 5. **Encode** each quadrant to **JPEG** (OpenCV `imencode`).
 6. **Serve** TCP MJPEG + **emit UDP pose** bundle per frame (or 30 Hz decimated).
@@ -83,6 +83,7 @@ src/holocade_hypercube/
 2. **`CubePassthroughRuntimeBinder`** — assigns textures to the rig (reference `CubeRigController` / `CubePassthroughSources` — may require **public setter** or **ScriptableObject** duplicate at runtime if asset is immutable).
 3. **`HyperCubeUDPTrackingShim` : `CubeFaceTrackingProviderBase`** — reads last **`HoloCadeUDPTransport`** float cache for channels **100–119**, converts **(u,v) atlas** → **approximate world eye** using **`CubeRigController`** side anchors / monitor dims (`TryGetCubeDimensionsMeters` / side transforms). v0.1 can use **flat billboard** approximation.
 4. **Scene wiring:** vision PC IP, ports, UDP bind on game PC.
+5. **Equirect / sphere display (later v0.1.x, tracks HyperCube equirect):** procedural **interior sphere** (or segmented sphere) mesh + UVs in Unity to replace **temporary portal quads** in `CubeBase` when the vision pipeline outputs equirectangular (or per-quadrant warps to UV islands). *Rectilinear portal path remains until then.* (Tracked in **HoloCade_Unity** README **v0.1.4 — Cube equirect / sphere display**.)
 
 ---
 
@@ -91,7 +92,7 @@ src/holocade_hypercube/
 | Tag | Deliverable |
 |-----|----------------|
 | **v0.0.2** | ✅ Eight **synthetic** feeds + atlas packer + **offline** PNG dump (`dump-atlas`) + stub TCP/UDP loop. |
-| **v0.0.3** | **`pipeline-test-images/`** — two flank **PNGs** (`face_left` / `face_right`) repeated **`L,R` × 4** into eight slots → **Unity pixel/layout** validation on four TCP JPEG quadrants. |
+| **v0.0.3** | **`pipeline-test-images/`** — two flank **PNGs** (`face_left` / `face_right`) repeated **`L,R` × 4** into eight slots; **portrait or landscape** cell geometry from **config** (same contract later for **MJPEG/USB**) → **Unity pixel/layout** validation on four TCP JPEG quadrants. |
 | **v0.0.4** | **Undistort + stereo rectification** maps per L/R pair (calibration on disk). |
 | **v0.0.5** | **Stereo depth** on rectified down-res ROI — **Vulkan** on Radeon, **CPU SGBM** fallback; OOB gating. |
 | **v0.0.6** | **MediaPipe** + **L/R flank selection** + **fuse depth + (u,v) → `vec3`** on Linux. |

@@ -10,28 +10,119 @@ import struct
 import time
 from pathlib import Path
 
+import cv2
 import yaml
 
-from holocade_hypercube.atlas.packer import pack_four_by_two
+from holocade_hypercube.atlas.packer import CELL_H, CELL_W, pack_four_by_two
+from holocade_hypercube.calibration import StereoRectifier, stereo_rectifier_from_config
 from holocade_hypercube.feeds.synthetic import synthetic_frame
 from holocade_hypercube.protocol.holocade_udp import build_float, build_int32
 from holocade_hypercube.quadrants.split import four_vertical_bands
 
 
 def encode_jpeg(bgr) -> bytes:
-    import cv2
-
     ok, buf = cv2.imencode(".jpg", bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
     if not ok:
         raise RuntimeError("jpeg encode failed")
     return buf.tobytes()
 
 
-def dump_atlas_png(path: Path) -> None:
-    import cv2
+def _image_orientation(width: int, height: int) -> str:
+    return "landscape" if width >= height else "portrait"
 
-    frames = [synthetic_frame(i) for i in range(8)]
-    atlas = pack_four_by_two(frames)
+
+def _fit_to_cell_same_orientation(image_bgr, cell_width: int, cell_height: int):
+    src_h, src_w = image_bgr.shape[:2]
+    if src_h == cell_height and src_w == cell_width:
+        return image_bgr
+    src_orientation = _image_orientation(src_w, src_h)
+    dst_orientation = _image_orientation(cell_width, cell_height)
+    if src_orientation != dst_orientation:
+        raise ValueError(
+            f"orientation mismatch: source {src_w}x{src_h} is {src_orientation}, "
+            f"cell {cell_width}x{cell_height} is {dst_orientation}"
+        )
+
+    src_aspect = src_w / src_h
+    dst_aspect = cell_width / cell_height
+
+    if src_aspect > dst_aspect:
+        crop_w = int(src_h * dst_aspect)
+        x0 = max(0, (src_w - crop_w) // 2)
+        cropped = image_bgr[:, x0 : x0 + crop_w]
+    else:
+        crop_h = int(src_w / dst_aspect)
+        y0 = max(0, (src_h - crop_h) // 2)
+        cropped = image_bgr[y0 : y0 + crop_h, :]
+    return cv2.resize(cropped, (cell_width, cell_height), interpolation=cv2.INTER_AREA)
+
+
+def _pipeline_test_png_frames(
+    cfg: dict, cell_width: int, cell_height: int, rectifier: StereoRectifier | None = None
+):
+    images_dir = Path(str(cfg.get("pipeline_test_images_dir", "pipeline-test-images")))
+    left_name = str(cfg.get("pipeline_test_left_image", "face_left.png"))
+    right_name = str(cfg.get("pipeline_test_right_image", "face_right.png"))
+    left_path = images_dir / left_name
+    right_path = images_dir / right_name
+    left = cv2.imread(str(left_path), cv2.IMREAD_COLOR)
+    right = cv2.imread(str(right_path), cv2.IMREAD_COLOR)
+    if left is None:
+        raise FileNotFoundError(f"pipeline_test_png missing left image: {left_path}")
+    if right is None:
+        raise FileNotFoundError(f"pipeline_test_png missing right image: {right_path}")
+    if rectifier is not None and rectifier.active:
+        left, right = rectifier.rectify_pair(left, right)
+    left = _fit_to_cell_same_orientation(left, cell_width, cell_height)
+    right = _fit_to_cell_same_orientation(right, cell_width, cell_height)
+    # Logical camera order: L,R repeated across four side pairs.
+    return [left, right, left, right, left, right, left, right]
+
+
+def _build_frames(
+    cfg: dict,
+    cell_width: int,
+    cell_height: int,
+    rectifier: StereoRectifier | None = None,
+):
+    feed_mode = str(cfg.get("feed_mode", "synthetic")).strip().lower()
+    if feed_mode == "synthetic":
+        return [synthetic_frame(i, width=cell_width, height=cell_height) for i in range(8)]
+    if feed_mode == "pipeline_test_png":
+        return _pipeline_test_png_frames(
+            cfg, cell_width=cell_width, cell_height=cell_height, rectifier=rectifier
+        )
+    raise ValueError(f"unsupported feed_mode: {feed_mode}")
+
+
+def _build_quadrants_from_atlas(
+    cfg: dict,
+    atlas,
+    cell_width: int,
+    cell_height: int,
+    out_width: int | None,
+    out_height: int | None,
+):
+    quadrant_layout_mode = str(cfg.get("quadrant_layout_mode", "vertical_bands")).strip().lower()
+    if quadrant_layout_mode == "vertical_bands":
+        return four_vertical_bands(
+            atlas,
+            cell_width=cell_width,
+            cell_height=cell_height,
+            out_width=out_width,
+            out_height=out_height,
+        )
+    if quadrant_layout_mode == "atlas_preview":
+        return [atlas, atlas, atlas, atlas]
+    raise ValueError(f"unsupported quadrant_layout_mode: {quadrant_layout_mode}")
+
+
+def dump_atlas_png(path: Path, cfg: dict) -> None:
+    cell_width = int(cfg.get("cell_width", CELL_W))
+    cell_height = int(cfg.get("cell_height", CELL_H))
+    rectifier = stereo_rectifier_from_config(cfg)
+    frames = _build_frames(cfg, cell_width=cell_width, cell_height=cell_height, rectifier=rectifier)
+    atlas = pack_four_by_two(frames, cell_width=cell_width, cell_height=cell_height)
     path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(path), atlas)
 
@@ -74,6 +165,10 @@ async def run_serve(cfg: dict) -> None:
     pose_port = int(cfg.get("pose_udp_port", 18100))
     fps = float(cfg.get("fps", 30.0))
     period = 1.0 / max(1.0, fps)
+    cell_width = int(cfg.get("cell_width", CELL_W))
+    cell_height = int(cfg.get("cell_height", CELL_H))
+    out_width = cfg.get("quadrant_output_width")
+    out_height = cfg.get("quadrant_output_height")
 
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -85,23 +180,38 @@ async def run_serve(cfg: dict) -> None:
         if w is not None and not w.transport.is_closing():
             return w
         port = int(ports[idx])
-        reader, writer = await asyncio.open_connection(unity_host, port)
+        # On some Windows setups, connecting to a closed localhost port can hang
+        # rather than raising ConnectionRefusedError quickly. Bound the connect time.
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(unity_host, port),
+            timeout=0.25,
+        )
         writers[idx] = writer
         return writer
 
+    rectifier = stereo_rectifier_from_config(cfg)
     seq = 0
     try:
         while True:
             t0 = time.perf_counter()
-            frames = [synthetic_frame(i) for i in range(8)]
-            atlas = pack_four_by_two(frames)
-            quads = four_vertical_bands(atlas)
+            frames = _build_frames(
+                cfg, cell_width=cell_width, cell_height=cell_height, rectifier=rectifier
+            )
+            atlas = pack_four_by_two(frames, cell_width=cell_width, cell_height=cell_height)
+            quads = _build_quadrants_from_atlas(
+                cfg,
+                atlas,
+                cell_width=cell_width,
+                cell_height=cell_height,
+                out_width=out_width,
+                out_height=out_height,
+            )
             for i, q in enumerate(quads):
                 jpeg = encode_jpeg(q)
                 try:
                     w = await ensure_connection(i)
                     await tcp_send_jpeg_frame(w, jpeg)
-                except (ConnectionRefusedError, OSError, asyncio.CancelledError) as e:
+                except (TimeoutError, ConnectionRefusedError, OSError, asyncio.CancelledError) as e:
                     writers[i] = None
                     print(f"[hypercube] quadrant {i} send failed ({e}); will retry")
 
@@ -126,15 +236,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="HoloCade HyperCube vision service")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_dump = sub.add_parser("dump-atlas", help="Write 5120x2880 synthetic atlas PNG and exit")
+    p_dump = sub.add_parser("dump-atlas", help="Write atlas PNG and exit")
     p_dump.add_argument("-o", "--output", type=Path, default=Path("out/atlas.png"))
+    p_dump.add_argument("-c", "--config", type=Path, default=None, help="YAML config (see config.example.yaml)")
 
     p_serve = sub.add_parser("serve", help="Stream quadrants to Unity + UDP pose")
     p_serve.add_argument("-c", "--config", type=Path, default=None, help="YAML config (see config.example.yaml)")
 
     args = parser.parse_args()
     if args.cmd == "dump-atlas":
-        dump_atlas_png(args.output)
+        cfg = load_config(args.config)
+        dump_atlas_png(args.output, cfg)
         print(f"wrote {args.output}")
         return
     if args.cmd == "serve":
