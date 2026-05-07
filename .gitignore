@@ -33,3 +33,6 @@ pipeline-test-images/*.png
 pipeline-test-images/*.jpg
 pipeline-test-images/*.jpeg
 pipeline-test-images/*.webp
+
+# Local pipeline test videos (sync'd left/right clips)
+pipeline-test-videos/

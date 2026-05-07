@@ -75,12 +75,13 @@ class StereoRectifier:
     When inactive (no file / mode none), rectify_pair returns inputs unchanged.
     """
 
-    __slots__ = ("_active", "_cal_size", "_map1x", "_map1y", "_map2x", "_map2y")
+    __slots__ = ("_active", "_cal_size", "_map1x", "_map1y", "_map2x", "_map2y", "_Q")
 
     def __init__(self, calibration_path: Path | None):
         self._active = False
         self._cal_size = (0, 0)
         self._map1x = self._map1y = self._map2x = self._map2y = None
+        self._Q = None
 
         if calibration_path is None or not calibration_path.is_file():
             return
@@ -88,7 +89,7 @@ class StereoRectifier:
         cal = load_stereo_calibration_json(calibration_path)
         cal_w, cal_h = cal["image_size"]
 
-        R1, R2, P1, P2, _Q, _roi1, _roi2 = cv2.stereoRectify(
+        R1, R2, P1, P2, Q, _roi1, _roi2 = cv2.stereoRectify(
             cal["K1"],
             cal["D1"],
             cal["K2"],
@@ -106,6 +107,7 @@ class StereoRectifier:
             cal["K2"], cal["D2"], R2, P2, (cal_w, cal_h), cv2.CV_32FC1
         )
         self._cal_size = (cal_w, cal_h)
+        self._Q = Q
         self._active = True
 
     @property
@@ -116,6 +118,11 @@ class StereoRectifier:
     def calibration_size(self) -> tuple[int, int]:
         """(width, height) images must match before remap (after resize if needed)."""
         return self._cal_size
+
+    @property
+    def Q(self) -> np.ndarray | None:
+        """4x4 reprojection matrix from cv2.stereoRectify (None when inactive)."""
+        return self._Q
 
     def rectify_pair(self, left_bgr: np.ndarray, right_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         if not self._active:

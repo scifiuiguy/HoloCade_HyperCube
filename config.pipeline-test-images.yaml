@@ -10,6 +10,20 @@ pipeline_test_images_dir: "pipeline-test-images"
 pipeline_test_left_image: "face_left.png"
 pipeline_test_right_image: "face_right.png"
 
+# Optional v0.0.5 stereo depth debug.
+stereo_rectify_mode: "stereo_json"
+stereo_calibration_json: "calibration/example_stereo_pair.json"
+stereo_depth_mode: "cpu_sgbm"
+stereo_depth_roi_policy: "sixths_overlap"
+stereo_depth_downscale: 1.0
+# Allow negative disparities (helps if left/right orientation ends up flipped).
+stereo_depth_min_disparity: -64
+stereo_depth_num_disparities: 192
+stereo_depth_block_size: 7
+stereo_depth_uniqueness_ratio: 5
+stereo_depth_debug_every_n: 30
+stereo_depth_debug_out_dir: "f:/HoloSnake/HoloCade_HyperCube/out"
+
 # Portrait cell geometry matching current test images.
 cell_width: 720
 cell_height: 1280

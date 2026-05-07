@@ -11,13 +11,20 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 import yaml
 
 from holocade_hypercube.atlas.packer import CELL_H, CELL_W, pack_four_by_two
 from holocade_hypercube.calibration import StereoRectifier, stereo_rectifier_from_config
+from holocade_hypercube.feeds.pipeline_test_video import (
+    PipelineTestVideoConfig,
+    PipelineTestVideoPlayer,
+    pipeline_test_video_frames,
+)
 from holocade_hypercube.feeds.synthetic import synthetic_frame
 from holocade_hypercube.protocol.holocade_udp import build_float, build_int32
 from holocade_hypercube.quadrants.split import four_vertical_bands
+from holocade_hypercube.stereo_depth import StereoDepthResult, stereo_depth_estimator_from_config
 
 
 def encode_jpeg(bgr) -> bytes:
@@ -79,11 +86,53 @@ def _pipeline_test_png_frames(
     return [left, right, left, right, left, right, left, right]
 
 
+def _depth_debug_viz(result: StereoDepthResult) -> "cv2.typing.MatLike | None":
+    if result.depth_z_m is None:
+        return None
+    z = result.depth_z_m
+    valid = result.valid_mask
+    if not valid.any():
+        return None
+    zmin = float(np.percentile(z[valid], 5))
+    zmax = float(np.percentile(z[valid], 95))
+    if not (zmax > zmin):
+        return None
+    zn = (np.clip(z, zmin, zmax) - zmin) / (zmax - zmin)
+    img = (zn * 255.0).astype(np.uint8)
+    img[~valid] = 0
+    return cv2.applyColorMap(img, cv2.COLORMAP_TURBO)
+
+
+def _valid_mask_viz(result: StereoDepthResult) -> "cv2.typing.MatLike":
+    m = (result.valid_mask.astype(np.uint8) * 255)
+    return cv2.cvtColor(m, cv2.COLOR_GRAY2BGR)
+
+
+def _disparity_viz(result: StereoDepthResult) -> "cv2.typing.MatLike":
+    # Visualize ROI disparity (not full-frame) so we can see sign/structure quickly.
+    d = result.disparity_px
+    if d.size == 0:
+        return np.zeros((8, 8, 3), dtype=np.uint8)
+    dv = d.copy()
+    # Robust stretch using percentiles over finite values.
+    finite = np.isfinite(dv)
+    if not finite.any():
+        return np.zeros((d.shape[0], d.shape[1], 3), dtype=np.uint8)
+    lo = float(np.percentile(dv[finite], 5))
+    hi = float(np.percentile(dv[finite], 95))
+    if not (hi > lo):
+        hi = lo + 1.0
+    dn = (np.clip(dv, lo, hi) - lo) / (hi - lo)
+    img = (dn * 255.0).astype(np.uint8)
+    return cv2.applyColorMap(img, cv2.COLORMAP_TURBO)
+
+
 def _build_frames(
     cfg: dict,
     cell_width: int,
     cell_height: int,
     rectifier: StereoRectifier | None = None,
+    video_player: PipelineTestVideoPlayer | None = None,
 ):
     feed_mode = str(cfg.get("feed_mode", "synthetic")).strip().lower()
     if feed_mode == "synthetic":
@@ -91,6 +140,16 @@ def _build_frames(
     if feed_mode == "pipeline_test_png":
         return _pipeline_test_png_frames(
             cfg, cell_width=cell_width, cell_height=cell_height, rectifier=rectifier
+        )
+    if feed_mode == "pipeline_test_video":
+        if video_player is None:
+            raise ValueError("pipeline_test_video requires a video player")
+        return pipeline_test_video_frames(
+            video_player,
+            cell_width=cell_width,
+            cell_height=cell_height,
+            rectifier=rectifier,
+            fit_to_cell_same_orientation=_fit_to_cell_same_orientation,
         )
     raise ValueError(f"unsupported feed_mode: {feed_mode}")
 
@@ -190,13 +249,71 @@ async def run_serve(cfg: dict) -> None:
         return writer
 
     rectifier = stereo_rectifier_from_config(cfg)
+    depth_estimator = stereo_depth_estimator_from_config(cfg)
+    depth_debug_every_n = int(cfg.get("stereo_depth_debug_every_n", 0))
+    depth_debug_out_dir = Path(str(cfg.get("stereo_depth_debug_out_dir", "out")))
+    video_player: PipelineTestVideoPlayer | None = None
+    if str(cfg.get("feed_mode", "synthetic")).strip().lower() == "pipeline_test_video":
+        video_player = PipelineTestVideoPlayer(PipelineTestVideoConfig.from_cfg(cfg))
     seq = 0
     try:
         while True:
             t0 = time.perf_counter()
             frames = _build_frames(
-                cfg, cell_width=cell_width, cell_height=cell_height, rectifier=rectifier
+                cfg,
+                cell_width=cell_width,
+                cell_height=cell_height,
+                rectifier=rectifier,
+                video_player=video_player,
             )
+
+            # v0.0.5: stereo depth (CPU SGBM fallback).
+            if (
+                depth_estimator is not None
+                and str(cfg.get("feed_mode", "synthetic")).strip().lower() == "pipeline_test_png"
+                and len(frames) >= 2
+            ):
+                result = depth_estimator.estimate(
+                    frames[0],
+                    frames[1],
+                    Q=rectifier.Q if rectifier.active else None,
+                    roi_cfg=cfg,
+                )
+                if depth_debug_every_n > 0 and (seq % depth_debug_every_n) == 0:
+                    viz = _depth_debug_viz(result)
+                    if viz is not None:
+                        depth_debug_out_dir.mkdir(parents=True, exist_ok=True)
+                        cv2.imwrite(str(depth_debug_out_dir / f"depth_debug_{seq:06d}.png"), viz)
+                        cv2.imwrite(
+                            str(depth_debug_out_dir / f"depth_valid_{seq:06d}.png"),
+                            _valid_mask_viz(result),
+                        )
+                        cv2.imwrite(
+                            str(depth_debug_out_dir / f"depth_disp_{seq:06d}.png"),
+                            _disparity_viz(result),
+                        )
+                    else:
+                        depth_debug_out_dir.mkdir(parents=True, exist_ok=True)
+                        fallback = frames[0].copy()
+                        cv2.putText(
+                            fallback,
+                            "depth_debug: no valid depth",
+                            (20, 60),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1.2,
+                            (0, 0, 255),
+                            3,
+                            cv2.LINE_AA,
+                        )
+                        cv2.imwrite(str(depth_debug_out_dir / f"depth_debug_{seq:06d}_noviz.png"), fallback)
+                        cv2.imwrite(
+                            str(depth_debug_out_dir / f"depth_valid_{seq:06d}.png"),
+                            _valid_mask_viz(result),
+                        )
+                        cv2.imwrite(
+                            str(depth_debug_out_dir / f"depth_disp_{seq:06d}.png"),
+                            _disparity_viz(result),
+                        )
             atlas = pack_four_by_two(frames, cell_width=cell_width, cell_height=cell_height)
             quads = _build_quadrants_from_atlas(
                 cfg,
@@ -222,6 +339,8 @@ async def run_serve(cfg: dict) -> None:
             elapsed = time.perf_counter() - t0
             await asyncio.sleep(max(0.0, period - elapsed))
     finally:
+        if video_player is not None:
+            video_player.close()
         udp_sock.close()
         for w in writers:
             if w is not None and not w.transport.is_closing():

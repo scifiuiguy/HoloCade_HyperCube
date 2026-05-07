@@ -227,8 +227,9 @@ Full implementation checklist, module layout, risks, and milestone definitions: 
 
 **Goal:** **Dense or semi-dense depth** from **rectified L/R** on a **down-res ROI** (2–3 ft working range, **min/max disparity** clamp, **OOB** disables tracking).
 
-- [ ] **Vulkan compute** path on **Radeon** target (SGM / AD-Census class or tuned simpler matcher first).
-- [ ] **CPU fallback** — OpenCV `StereoSGBM` / `StereoBM` for Windows dev / bring-up.
+- [ ] **ROI policy** — define and implement how we pick a **Region Of Interest** per stereo pair (manual pixel box vs a predictable heuristic based on expected face location).
+- [ ] **CPU reference path (bring-up)** — OpenCV `StereoSGBM` / `StereoBM` to validate ROI, disparity limits, and OOB gating on dev machines.
+- [ ] **Vulkan compute path (target)** — Radeon-friendly GPU matcher (SGM / AD-Census class or tuned simpler matcher first) behind the same interface as CPU.
 - [ ] **Output** — disparity or **metric depth** map in a frame agreed with fusion (same clock as rectified left **preferred**, loose coupling OK per design).
 - [ ] **Parallel to atlas** — stereo runs on **pair buffers**; **does not** require atlas-first packing.
 

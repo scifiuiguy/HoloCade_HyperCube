@@ -15,16 +15,37 @@ fps: 30.0
 # Feed source:
 # - synthetic: generated color swatches for all 8 logical cameras
 # - pipeline_test_png: load left/right PNGs from pipeline_test_images_dir and repeat L,R x4
+# - pipeline_test_video: load left/right videos from pipeline_test_videos_dir and repeat L,R x4
 feed_mode: "synthetic"
 pipeline_test_images_dir: "pipeline-test-images"
 pipeline_test_left_image: "face_left.png"
 pipeline_test_right_image: "face_right.png"
+
+# pipeline_test_video:
+# pipeline_test_videos_dir: "pipeline-test-videos"
+# pipeline_test_left_video: "left.mp4"
+# pipeline_test_right_video: "right.mp4"
+# pipeline_test_video_offset_frames: 0  # positive => advance right, negative => advance left
+# pipeline_test_video_loop: true
 
 # Stereo undistort + rectification (pipeline_test_png only; synthetic feed ignores this):
 # - none: no remap (default)
 # - stereo_json: load stereo_calibration_json (camera matrices, distortion, R|T); JSON is fine for tiny cal files
 stereo_rectify_mode: "none"
 # stereo_calibration_json: "calibration/example_stereo_pair.json"
+
+# Stereo depth (v0.0.5):
+# - none (default)
+# - cpu_sgbm: OpenCV StereoSGBM fallback (use with stereo_rectify_mode: stereo_json for metric Z)
+stereo_depth_mode: "none"
+# stereo_depth_downscale: 0.5
+# stereo_depth_roi_policy: "sixths_overlap"  # or "full" (default). Used when stereo_depth_roi is omitted.
+# stereo_depth_roi: [0, 0, 1280, 720]    # [x,y,w,h] in pixels (cell/rectified coordinates)
+# stereo_depth_min_depth_m: 0.6          # ~2 ft
+# stereo_depth_max_depth_m: 0.9          # ~3 ft
+# stereo_depth_valid_frac_threshold: 0.02
+# stereo_depth_debug_every_n: 30         # write out/depth_debug_*.png every N frames (0 disables)
+# stereo_depth_debug_out_dir: "out"
 
 # Cell geometry (portrait or landscape). Atlas size is 4*cell_width x 2*cell_height.
 cell_width: 1280
